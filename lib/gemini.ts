@@ -5,12 +5,31 @@ const genAI = new GoogleGenerativeAI(apiKey);
 
 
 function extractJson(text: string) {
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-  if (jsonMatch && jsonMatch[1]) return jsonMatch[1].trim();
-  const startIndex = text.indexOf("{");
-  const endIndex = text.lastIndexOf("}");
-  if (startIndex !== -1 && endIndex !== -1) return text.substring(startIndex, endIndex + 1);
-  return text.trim();
+  try {
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonMatch && jsonMatch[1]) return jsonMatch[1].trim();
+    const startIndex = text.indexOf("{");
+    const endIndex = text.lastIndexOf("}");
+    if (startIndex !== -1 && endIndex !== -1) return text.substring(startIndex, endIndex + 1);
+    return text.trim();
+  } catch (e) {
+    console.error("JSON Extraction Error:", e);
+    return text;
+  }
+}
+
+function prepareImagePart(base64Data: string) {
+  // Strip prefix if exists (e.g., data:image/jpeg;base64,)
+  const base64Content = base64Data.includes(";base64,")
+    ? base64Data.split(";base64,")[1]
+    : base64Data;
+
+  // Try to detect mime type from prefix
+  let mimeType = "image/jpeg";
+  if (base64Data.startsWith("data:image/png")) mimeType = "image/png";
+  if (base64Data.startsWith("data:image/webp")) mimeType = "image/webp";
+
+  return { inlineData: { data: base64Content, mimeType } };
 }
 
 export async function verifyMedicine(oldStripBase64: string, newStripBase64: string) {
@@ -114,12 +133,14 @@ export async function analyzeSingleMedicine(imageBase64: string) {
       Ensure absolute accuracy in salt composition and strength detection. 
       Respond ONLY with the JSON object.
     `;
-    const imagePart = { inlineData: { data: imageBase64, mimeType: "image/jpeg" } };
+    const imagePart = prepareImagePart(imageBase64);
     const result = await model.generateContent([prompt, imagePart]);
-    return JSON.parse(extractJson(result.response.text()));
+    const responseText = result.response.text();
+    console.log("Gemini Raw Response:", responseText);
+    return JSON.parse(extractJson(responseText));
   } catch (error) {
     console.error("Medicine analysis error:", error);
-    throw new Error("Medicine analysis failed");
+    throw error;
   }
 }
 
