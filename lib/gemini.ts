@@ -34,7 +34,7 @@ function prepareImagePart(base64Data: string) {
 
 export async function verifyMedicine(oldStripBase64: string, newStripBase64: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `
       You are an expert Pharmacy Auditor. Compare these two medicine strips for composition matching and safety.
       Image 1: Old Strip (Prescribed/Previous). Image 2: New Strip (Current/Dispensed).
@@ -69,7 +69,7 @@ export async function verifyMedicine(oldStripBase64: string, newStripBase64: str
 
 export async function analyzePrescription(imageBase64: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `
       Analyze this prescription image. 
       1. Extract all medicines (Name, Dosage, Timing, Duration, Why prescribed).
@@ -86,7 +86,7 @@ export async function analyzePrescription(imageBase64: string) {
 
 export async function findGenerics(medicineName: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `
       Find generic alternatives for the medicine: ${medicineName}.
       Ensure identical salt composition and strength.
@@ -109,7 +109,7 @@ export async function findGenerics(medicineName: string) {
 
 export async function analyzeSingleMedicine(imageBase64: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `
       As an expert Medical Auditor, analyze this medicine image and provide structured, reliable medical information.
       
