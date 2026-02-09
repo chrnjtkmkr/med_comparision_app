@@ -1,15 +1,6 @@
-@import "tailwindcss";
-
-@theme {
-  --font-sans: var(--font-inter);
-  --font-display: var(--font-space-grotesk);
-
-  --color-background-light: #f8fafc;
-  --color-background-dark: #020617;
-  --color-primary: #0ea5e9;
-  --color-secondary: #6366f1;
-  --color-accent: #f43f5e;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   :root {
@@ -56,16 +47,13 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground transition-colors duration-300;
-    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
