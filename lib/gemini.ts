@@ -3,77 +3,123 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = process.env.GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
+
+function extractJson(text: string) {
+  const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+  if (jsonMatch && jsonMatch[1]) return jsonMatch[1].trim();
+  const startIndex = text.indexOf("{");
+  const endIndex = text.lastIndexOf("}");
+  if (startIndex !== -1 && endIndex !== -1) return text.substring(startIndex, endIndex + 1);
+  return text.trim();
+}
+
 export async function verifyMedicine(oldStripBase64: string, newStripBase64: string) {
   try {
-    // defaults to gemini-1.5-flash if gemini-2.0 is not yet available in the public SDK/region
-    // But user asked for Gemini 3 (assuming they meant latest). 
-    // We will use a model that supports vision.
-    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
     const prompt = `
-      You are an expert Pharmacy Auditor. 
-      Compare these two medicine strips. 
-      Image 1: Old Strip (Prescribed/Previous).
-      Image 2: New Strip (Current/Dispensed).
-
-      Analyze the Salt Composition visible in both.
-      1. Are they a SAFE MATCH? (Identical salts or generic equivalent).
-      2. If not, explain the MISMATCH.
-      3. Identify both medicines.
-      4. Provide Uses, Pros, Cons, and Precautions for BOTH medicines.
-      5. Suggest a Generic Alternative for the basic treatment if applicable.
-      6. Provide a Comparison Table comparing Salt, Strength, and Type.
-      7. Include a strict disclaimer/warning.
-      8. Output the response in JSON format with these exact keys: 
-         {
-           "match_status": "SAFE MATCH" | "MISMATCH",
-           "reason": "String explanation...",
-           "warnings": ["Warning 1", "Warning 2"],
-           "generic_suggestion": {
-             "name": "Generic Name",
-             "benefit": "Why this is suggested (e.g. Cost)"
-           },
-           "comparison_table": [
-             { "feature": "Salt Composition", "old": "Value", "new": "Value" },
-             { "feature": "Strength/Dosage", "old": "Value", "new": "Value" },
-             { "feature": "Manufacturer Type", "old": "Value", "new": "Value" }
-           ],
-           "old_medicine": {
-             "name": "Identified Name",
-             "details": {
-               "uses": "String (In English)",
-               "pros": "String (In English)",
-               "cons": "String (In English)",
-               "precautions": "String (In English)"
-             }
-           },
-           "new_medicine": {
-             "name": "Identified Name",
-             "details": {
-               "uses": "String (In English)",
-               "pros": "String (In English)",
-               "cons": "String (In English)",
-               "precautions": "String (In English)"
-             }
-           }
-         }
+      You are an expert Pharmacy Auditor. Compare these two medicine strips for composition matching and safety.
+      Image 1: Old Strip (Prescribed/Previous). Image 2: New Strip (Current/Dispensed).
+      
+      Required Output Format (Strict JSON):
+      {
+        "match_percentage": number,
+        "verdict": "SAFE" | "ASK DOCTOR" | "NOT RECOMMENDED",
+        "match_status": "SAFE MATCH" | "MISMATCH DETECTED" | "CRITICAL ALERT",
+        "reason": "Clear explanation of why this verdict was given.",
+        "warnings": ["Warning 1", "Warning 2"],
+        "generic_suggestion": { "name": "Generic Name", "benefit": "Save % info" },
+        "comparison_table": [
+          { "feature": "Salt 1", "old": "Old Strength", "new": "New Strength" }
+        ],
+        "old_medicine": { "name": "Name", "details": { "uses": "", "pros": "", "cons": "", "precautions": "" } },
+        "new_medicine": { "name": "Name", "details": { "uses": "", "pros": "", "cons": "", "precautions": "" } }
+      }
+      Respond ONLY with the JSON object.
     `;
-
     const imageParts = [
       { inlineData: { data: oldStripBase64, mimeType: "image/jpeg" } },
       { inlineData: { data: newStripBase64, mimeType: "image/jpeg" } },
     ];
-
     const result = await model.generateContent([prompt, ...imageParts]);
-    const response = await result.response;
-    const text = response.text();
-
-    // Clean up markdown code blocks if present
-    const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-
-    return JSON.parse(cleanText);
+    return JSON.parse(extractJson(result.response.text()));
   } catch (error) {
     console.error("Gemini Scan Error:", error);
     throw new Error(`Gemini Scan Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
+export async function analyzePrescription(imageBase64: string) {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const prompt = `
+      Analyze this prescription image. 
+      1. Extract all medicines (Name, Dosage, Timing, Duration, Why prescribed).
+      2. Provide a strict medical disclaimer.
+      Output in JSON: { "medicines": [{ "name", "dosage", "timing", "duration", "explanation" }], "disclaimer" }
+    `;
+    const imagePart = { inlineData: { data: imageBase64, mimeType: "image/jpeg" } };
+    const result = await model.generateContent([prompt, imagePart]);
+    return JSON.parse(extractJson(result.response.text()));
+  } catch (error) {
+    throw new Error("Prescription Analysis failed");
+  }
+}
+
+export async function findGenerics(medicineName: string) {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const prompt = `
+      Find generic alternatives for the medicine: ${medicineName}.
+      Ensure identical salt composition and strength.
+      
+      Required Output Format (Strict JSON):
+      {
+        "original": { "name": "Brand Name", "salt": "Chemical Composition" },
+        "generics": [
+          { "name": "Generic Brand", "salt": "Identical Salt", "price_range": "Range in ₹", "benefit": "Briefly why this is a good choice" }
+        ]
+      }
+      Respond ONLY with the JSON object.
+    `;
+    const result = await model.generateContent(prompt);
+    return JSON.parse(extractJson(result.response.text()));
+  } catch (error) {
+    throw new Error("Generic search failed");
+  }
+}
+
+export async function analyzeSingleMedicine(imageBase64: string) {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const prompt = `
+      As an expert Medical Auditor, analyze this medicine image and provide structured, reliable medical information.
+      
+      Identify the medicine name, brand, salts, strength, dosage form, and treated conditions.
+      
+      Required Output Format (Strict JSON):
+      {
+        "medicine_name": "Full brand name and generic name",
+        "short_description": "A precise 1-sentence summary of what this medicine is and its type.",
+        "main_uses": ["Primary indication 1", "Primary indication 2"],
+        "salts": ["Salt 1 + Strength (e.g. Paracetamol 500mg)", "Salt 2..."],
+        "strength": "Overall strength/concentration",
+        "form": "Dosage form (e.g., Tablet, Capsule, Syrup, Gel)",
+        "how_to_take": "Clear instructions on how to consume/apply this medicine.",
+        "pros": ["Key benefit/efficacy 1", "Benefit 2"],
+        "cons": ["Potential side effect or drawback 1", "Drawback 2"],
+        "warnings": ["Critical safety warning 1", "Interaction warning"],
+        "who_should_avoid": ["Groups or conditions that should avoid this medicine"]
+      }
+      
+      Ensure absolute accuracy in salt composition and strength detection. 
+      Respond ONLY with the JSON object.
+    `;
+    const imagePart = { inlineData: { data: imageBase64, mimeType: "image/jpeg" } };
+    const result = await model.generateContent([prompt, imagePart]);
+    return JSON.parse(extractJson(result.response.text()));
+  } catch (error) {
+    console.error("Medicine analysis error:", error);
+    throw new Error("Medicine analysis failed");
+  }
+}
+

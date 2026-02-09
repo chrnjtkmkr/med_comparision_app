@@ -21,17 +21,20 @@ const config = {
         extend: {
             fontFamily: {
                 sans: ["var(--font-sans)", ...fontFamily.sans],
+                display: ["Space Grotesk", "sans-serif"],
             },
             colors: {
+                primary: {
+                    DEFAULT: "#137fec",
+                    foreground: "#ffffff",
+                },
+                "background-light": "#f6f7f8",
+                "background-dark": "#101922",
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
                 ring: "hsl(var(--ring))",
                 background: "hsl(var(--background))",
                 foreground: "hsl(var(--foreground))",
-                primary: {
-                    DEFAULT: "hsl(var(--primary))",
-                    foreground: "hsl(var(--primary-foreground))",
-                },
                 secondary: {
                     DEFAULT: "hsl(var(--secondary))",
                     foreground: "hsl(var(--secondary-foreground))",

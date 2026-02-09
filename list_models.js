@@ -1,7 +1,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Hardcoding key here for the script as loading from .env.local needs extra setup in plain node script
-const apiKey = "AIzaSyDrZlGg-c70ZAYqPfBqxk4fCljAtLOlv2w";
+const apiKey = "AIzaSyAFn4pcU7AzQxwwtDo6RNAMj8B2l-et47k";
 
 const genAI = new GoogleGenerativeAI(apiKey);
 

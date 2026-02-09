@@ -1,26 +1,28 @@
 "use server";
 
-import { verifyMedicine } from "@/lib/gemini";
+import { analyzeSingleMedicine } from "@/lib/gemini";
 import { logScanResult } from "@/lib/google-sheets";
+import { uploadToDrive } from "@/lib/google-drive";
 
-export async function verifyMedicineAction(formData: FormData) {
-    const oldStrip = formData.get("oldStrip") as string;
-    const newStrip = formData.get("newStrip") as string;
+export async function scanMedicineAction(formData: FormData) {
+    const image = formData.get("image") as string;
+    if (!image) return { error: "Image is required." };
 
-    if (!oldStrip || !newStrip) {
-        return { error: "Both images are required." };
-    }
-
-    // Verify with Gemini
     try {
-        const result = await verifyMedicine(oldStrip, newStrip);
+        // 1. Optional: Upload to Drive for logs
+        const upload = await uploadToDrive(image, `scan_${Date.now()}.jpg`).catch(() => null);
 
-        // Log to Google Sheets (fire and forget)
-        // logScanResult(result).catch(console.error);
+        // 2. Analyze with Gemini
+        const result = await analyzeSingleMedicine(image);
+
+        // 3. Optional: Log to Sheets
+        if (result) {
+            logScanResult("MedicineScan", result, upload ? [{ id: upload.id, link: upload.link }] : []).catch(console.error);
+        }
 
         return { success: true, data: result };
     } catch (error) {
-        console.error("Verification failed:", error);
-        return { error: error instanceof Error ? error.message : "Failed to verify medicine." };
+        console.error("Scan error:", error);
+        return { error: "Failed to identify medicine. Please ensure the image is clear." };
     }
 }
